@@ -1,0 +1,174 @@
+extends layout
+
+block content
+  // Stats Row
+  .columns.is-multiline.mb-5
+    .column.is-3
+      .box.has-background-dark.stat-box
+        .level.is-mobile
+          .level-left
+            div
+              p.heading.has-text-grey-light 照片总数 (Total Photos)
+              p.title.is-4.has-text-primary #{photos.length}
+          .level-right
+            span.icon.is-large.has-text-primary
+              i.mdi.mdi-image-filter-frames.mdi-36px
+
+    .column.is-3
+      .box.has-background-dark.stat-box
+        .level.is-mobile
+          .level-left
+            div
+              p.heading.has-text-grey-light 玩家卡数 (Players / Cards)
+              p.title.is-4.has-text-info #{totalUsers}
+          .level-right
+            span.icon.is-large.has-text-info
+              i.mdi.mdi-account-group.mdi-36px
+
+    .column.is-3
+      .box.has-background-dark.stat-box
+        .level.is-mobile
+          .level-left
+            div
+              p.heading.has-text-grey-light 占用空间 (Storage Size)
+              p.title.is-4.has-text-success #{totalStorage}
+          .level-right
+            span.icon.is-large.has-text-success
+              i.mdi.mdi-harddisk.mdi-36px
+
+    .column.is-3
+      .box.has-background-dark.stat-box
+        .level.is-mobile
+          .level-left
+            div
+              p.heading.has-text-grey-light 服务状态 (Service Status)
+              p.title.is-4.has-text-warning 在线 (Online)
+          .level-right
+            span.icon.is-large.has-text-warning
+              i.mdi.mdi-server-network.mdi-36px
+
+  // Filters & Search Bar
+  .box.has-background-dark.mb-5
+    .columns.is-variable.is-2.is-vcentered
+      .column.is-4
+        .field
+          label.label.is-small.has-text-grey-light 搜索 (Search RefID / File)
+          .control.has-icons-left
+            input#searchInput.input.is-small(type="text" placeholder="输入卡号 RefID 或文件名过滤...")
+            span.icon.is-small.is-left
+              i.mdi.mdi-magnify
+
+      .column.is-3
+        .field
+          label.label.is-small.has-text-grey-light 游戏机种 (Game Model)
+          .control.has-icons-left
+            .select.is-small.is-fullwidth
+              select#gameFilter
+                option(value="") 全部机种 (All Games)
+                each game in gameList
+                  option(value=game) #{game}
+            span.icon.is-small.is-left
+              i.mdi.mdi-gamepad-variant
+
+      .column.is-3
+        .field
+          label.label.is-small.has-text-grey-light 玩家卡号 (Player RefID)
+          .control.has-icons-left
+            .select.is-small.is-fullwidth
+              select#userFilter
+                option(value="") 全部玩家 (All Players)
+                each user in userList
+                  option(value=user) #{user}
+            span.icon.is-small.is-left
+              i.mdi.mdi-card-account-details
+
+      .column.is-2.has-text-right-tablet
+        label.label.is-small.is-hidden-mobile &nbsp;
+        button#refreshBtn.button.is-small.is-primary.is-outlined.is-fullwidth
+          span.icon
+            i.mdi.mdi-refresh
+          span 刷新列表
+
+  // Photo Grid
+  if photos.length === 0
+    .box.has-text-centered.py-6
+      span.icon.is-large.has-text-grey
+        i.mdi.mdi-image-off.mdi-48px
+      p.title.is-5.has-text-grey.mt-3 暂无上传的照片
+      p.subtitle.is-6.has-text-grey-light 在街机游戏中拍摄并上传照片后，将自动展示在此处。
+  else
+    #photoGrid.columns.is-multiline
+      each photo in photos
+        .column.is-4-desktop.is-6-tablet.photo-card-item(
+          data-refid=photo.refId
+          data-game=photo.gameTitle
+          data-filename=photo.fileName
+          data-time=photo.uploadTime
+        )
+          .card.photo-card
+            .card-image
+              figure.image.is-4by3.photo-thumb-container
+                img.photo-thumb(src=photo.url alt=photo.fileName loading="lazy")
+                .photo-overlay
+                  button.button.is-small.is-primary.btn-preview(
+                    data-url=photo.url
+                    data-title=photo.gameTitle
+                    data-refid=photo.refId
+                    data-time=photo.uploadTime
+                    data-size=(photo.fileSizeBytes / 1024).toFixed(1) + " KB"
+                    data-filename=photo.fileName
+                  )
+                    span.icon
+                      i.mdi.mdi-eye
+                    span 预览大图
+            .card-content.p-3
+              .level.is-mobile.mb-1
+                .level-left
+                  span.tag.is-primary.is-light.is-small #{photo.gameTitle}
+                .level-right
+                  span.tag.is-dark.is-small #{(photo.fileSizeBytes / 1024).toFixed(1)} KB
+
+              p.is-size-7.has-text-weight-semibold.has-text-white.text-truncate(title=photo.fileName)
+                | #{photo.fileName}
+
+              .level.is-mobile.is-size-7.has-text-grey-light.mt-2
+                .level-left
+                  span.icon.is-small.mr-1
+                    i.mdi.mdi-card-account-details-outline
+                  span #{photo.refId}
+                .level-right
+                  span.icon.is-small.mr-1
+                    i.mdi.mdi-clock-outline
+                  span #{new Date(photo.timestamp).toLocaleDateString()}
+
+            footer.card-footer
+              a.card-footer-item.has-text-info.is-size-7(href=photo.url download=photo.fileName)
+                span.icon.is-small
+                  i.mdi.mdi-download
+                span 下载原图
+              a.card-footer-item.has-text-danger.is-size-7.btn-delete(
+                href="#"
+                data-refid=photo.refId
+                data-filename=photo.fileName
+              )
+                span.icon.is-small
+                  i.mdi.mdi-trash-can-outline
+                span 删除
+
+  // Lightbox Modal
+  #lightboxModal.modal
+    .modal-background
+    .modal-content.has-text-centered
+      p.image.mb-3
+        img#lightboxImg(src="" alt="Preview")
+      .box.has-background-dark.has-text-left.p-3
+        .columns.is-mobile.is-vcentered
+          .column
+            p#lightboxTitle.title.is-6.has-text-white.mb-1
+            p#lightboxDetails.subtitle.is-7.has-text-grey-light.mb-0
+          .column.is-narrow
+            a#lightboxDownload.button.is-small.is-primary(href="" download="")
+              span.icon
+                i.mdi.mdi-download
+              span 下载
+    button#lightboxClose.modal-close.is-large(aria-label="close")

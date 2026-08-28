@@ -1,0 +1,53 @@
+doctype html
+html(lang="en" data-theme="dark")
+  head
+    meta(charset="utf-8")
+    meta(name="viewport" content="width=device-width, initial-scale=1")
+    title EA3 Uploader Gallery | Asphyxia CORE
+    link(rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.0/css/bulma.min.css")
+    link(rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css")
+    link(rel="stylesheet" href="/css/style.css")
+  body
+    nav.navbar.is-dark.has-shadow(role="navigation" aria-label="main navigation")
+      .container
+        .navbar-brand
+          a.navbar-item(href="/")
+            span.icon.has-text-primary.mr-2
+              i.mdi.mdi-camera-burst.mdi-24px
+            strong.has-text-white EA3 Uploader
+            span.tag.is-primary.is-light.ml-2 Asphyxia
+          a.navbar-burger(role="button" aria-label="menu" aria-expanded="false" data-target="navbarBasic")
+            span(aria-hidden="true")
+            span(aria-hidden="true")
+            span(aria-hidden="true")
+
+        #navbarBasic.navbar-menu
+          .navbar-start
+            a.navbar-item(href="/")
+              span.icon
+                i.mdi.mdi-image-multiple
+              span 相册中心 (Gallery)
+          .navbar-end
+            .navbar-item
+              .tags.has-addons
+                span.tag.is-dark Port
+                span.tag.is-primary #{config.PORT}
+            .navbar-item
+              a.button.is-small.is-light.is-outlined(href="https://github.com/Cetaceaqua/asphyxia-ea3-uploader" target="_blank")
+                span.icon
+                  i.mdi.mdi-github
+                span GitHub
+
+    section.section
+      .container
+        block content
+
+    footer.footer.has-background-black-ter.has-text-centered.py-6.mt-6
+      .container
+        p.has-text-grey-light
+          strong EA3 Uploader Service
+          |  &bull; Designed for Asphyxia CORE Arcade Server &bull; Universal Media Hub
+        p.has-text-grey.is-size-7.mt-1
+          | LovePlus Arcade &bull; SOUND VOLTEX &bull; Nostalgia &bull; Konami e-Amusement Series
+
+    script(src="/js/gallery.js")
