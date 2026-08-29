@@ -4,19 +4,9 @@ import * as fs from "fs";
 import chalk from "chalk";
 import { CONFIG, openBrowser } from "./config";
 import { extractTar } from "./tar";
-import {
-  ensureDirectoryExists,
-  savePhotoWithMetadata,
-} from "./metadata";
-import {
-  parseXRPCRequest,
-  buildDeclareUploadResponse,
-  buildCommitUploadResponse,
-} from "./xrpc";
+import { ensureDirectoryExists, savePhotoWithMetadata } from "./metadata";
 import { apiRouter } from "./routes/api";
 import { webuiRouter } from "./routes/webui";
-
-const VERSION = "1.0.0";
 
 function pad(str: string, length: number): string {
   const totalPadding = Math.max(0, length - str.length);
@@ -31,10 +21,8 @@ function logInfo(msg: string): void {
 
 const app = express();
 
-// Ensure photos directory exists
 ensureDirectoryExists(CONFIG.SAVEDATA_DIR);
 
-// Setup robust views and public directories
 const viewsDir = fs.existsSync(path.resolve(__dirname, "../views"))
   ? path.resolve(__dirname, "../views")
   : path.resolve(__dirname, "views");
@@ -47,12 +35,12 @@ app.set("view engine", "pug");
 app.disable("x-powered-by");
 app.disable("etag");
 
-// Serve static assets
 app.use("/public", express.static(publicDir));
 app.use("/css", express.static(path.join(publicDir, "css")));
 app.use("/js", express.static(path.join(publicDir, "js")));
+app.use("/fonts", express.static(path.join(publicDir, "fonts")));
+app.use(express.static(publicDir));
 
-// Serve stored photos statically with caching headers
 app.use(
   "/photos",
   express.static(CONFIG.SAVEDATA_DIR, {
@@ -63,69 +51,13 @@ app.use(
   })
 );
 
-// Raw body parser middleware for handling binary / multipart / XML
 app.use(
   express.raw({
-    type: [
-      "application/xml",
-      "text/xml",
-      "application/octet-stream",
-      "multipart/form-data",
-    ],
+    type: ["application/octet-stream", "multipart/form-data"],
     limit: "50mb",
   })
 );
 
-/**
- * Handles EA3 XRPC POST requests (uploader.declareUpload & uploader.commitUpload)
- */
-app.post("*", (req: express.Request, res: express.Response, next: express.NextFunction) => {
-  const contentType = (req.headers["content-type"] || "").toLowerCase();
-
-  if (req.path === "/upload" && (contentType.includes("multipart") || contentType.includes("octet-stream"))) {
-    return next();
-  }
-
-  const body = req.body;
-  if (Buffer.isBuffer(body) && body.length > 0) {
-    const isXML = body.subarray(0, 10).toString("ascii").includes("<");
-    if (isXML) {
-      const xrpc = parseXRPCRequest(body);
-      if (xrpc && xrpc.module === "uploader") {
-        logInfo(`Received ${chalk.cyan(xrpc.method)} from Model: ${xrpc.model} (SrcID: ${xrpc.srcid})`);
-
-        if (xrpc.method === "declareUpload") {
-          const arrangeNum = `${Math.floor(1000000000 + Math.random() * 9000000000)}`;
-          const hostHeader = req.headers.host || `${CONFIG.PUBLIC_HOST}:${CONFIG.PORT}`;
-          const [hostOnly, portStr] = hostHeader.split(":");
-          const port = portStr ? parseInt(portStr, 10) : CONFIG.PORT;
-
-          const responseXML = buildDeclareUploadResponse(
-            xrpc.srcid,
-            arrangeNum,
-            hostOnly || CONFIG.PUBLIC_HOST,
-            port
-          );
-
-          res.setHeader("Content-Type", "application/xml; charset=shift_jis");
-          return res.send(responseXML);
-        }
-
-        if (xrpc.method === "commitUpload") {
-          const responseXML = buildCommitUploadResponse(xrpc.srcid);
-          res.setHeader("Content-Type", "application/xml; charset=shift_jis");
-          return res.send(responseXML);
-        }
-      }
-    }
-  }
-
-  next();
-});
-
-/**
- * Handles HTTP POST file upload (multipart/form-data or binary TAR payload)
- */
 app.post("/upload", (req: express.Request, res: express.Response) => {
   const body = req.body;
 
@@ -161,13 +93,15 @@ app.post("/upload", (req: express.Request, res: express.Response) => {
 
   const parts = originalFileName.split("_");
   const refId = parts[0] || "UNKNOWN";
+  const queryGame = (req.query.game || req.query.model) as string | undefined;
+  const gameModel = queryGame ? decodeURIComponent(queryGame).trim() : undefined;
 
   const extractedFiles = extractTar(payloadBuffer);
   if (extractedFiles.length > 0) {
     logInfo(`Unpacked ${extractedFiles.length} file(s) from TAR archive:`);
     for (const f of extractedFiles) {
       if (f.name.toLowerCase().endsWith(".jpg") || f.name.toLowerCase().endsWith(".jpeg") || f.name.toLowerCase().endsWith(".png")) {
-        const meta = savePhotoWithMetadata(CONFIG.SAVEDATA_DIR, refId, f.name, f.data);
+        const meta = savePhotoWithMetadata(CONFIG.SAVEDATA_DIR, refId, f.name, f.data, { gameModel });
         logInfo(
           `  -> Saved photo: ${chalk.green(meta.fileName)} (${(meta.fileSizeBytes / 1024).toFixed(1)} KB) for RefID: ${chalk.cyan(refId)}`
         );
@@ -184,7 +118,7 @@ app.post("/upload", (req: express.Request, res: express.Response) => {
     if (jpegStart !== -1 && jpegEnd !== -1 && jpegEnd > jpegStart) {
       const jpegData = payloadBuffer.subarray(jpegStart, jpegEnd + 2);
       const jpegName = originalFileName.replace(/\.tar$/i, ".jpg");
-      const meta = savePhotoWithMetadata(CONFIG.SAVEDATA_DIR, refId, jpegName, jpegData);
+      const meta = savePhotoWithMetadata(CONFIG.SAVEDATA_DIR, refId, jpegName, jpegData, { gameModel });
       logInfo(
         `  -> Saved extracted JPEG: ${chalk.green(meta.fileName)} (${(meta.fileSizeBytes / 1024).toFixed(1)} KB) for RefID: ${chalk.cyan(refId)}`
       );
@@ -205,24 +139,22 @@ app.post("/upload", (req: express.Request, res: express.Response) => {
   res.end("OK");
 });
 
-// Mount WebUI & API routes
 app.use("/", webuiRouter);
 app.use("/api", apiRouter);
 
-// Start server
 const bindHost = CONFIG.BIND === "localhost" ? "127.0.0.1" : CONFIG.BIND;
 
 app.listen(CONFIG.PORT, bindHost, () => {
   process.title = "Asphyxia EA3 Uploader";
 
-  console.log("                        _                _        ");
-  console.log("        /\\             | |              (_)      ");
-  console.log("       /  \\   ___ _ __ | |__  _   ___  ___  __ _ ");
+  console.log('                        _                _        ');
+  console.log('        /\\             | |              (_)      ');
+  console.log('       /  \\   ___ _ __ | |__  _   ___  ___  __ _ ');
   console.log("      / /\\ \\ / __| '_ \\| '_ \\| | | \\ \\/ / |/ _` |");
-  console.log("     / ____ \\\\__ \\ |_) | | | | |_| |>  <| | (_| |");
-  console.log("    /_/    \\_\\___/ .__/|_| |_|\\__, /_/\\_\\_|\\__,_|");
-  console.log("                 | |           __/ |              ");
-  console.log("                 |_|          |___/               ");
+  console.log('     / ____ \\\\__ \\ |_) | | | | |_| |>  <| | (_| |');
+  console.log('    /_/    \\_\\___/ .__/|_| |_|\\__, /_/\\_\\_|\\__,_|');
+  console.log('                 | |           __/ |              ');
+  console.log('                 |_|          |___/               ');
   console.log("");
   console.log(chalk.cyanBright(pad("EA3 UPLOADER", 60)));
   console.log(" ");

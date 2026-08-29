@@ -1,41 +1,27 @@
 document.addEventListener("DOMContentLoaded", () => {
-  // Mobile Burger Menu
-  const burger = document.querySelector(".navbar-burger");
-  const menu = document.getElementById("navbarBasic");
-  if (burger && menu) {
-    burger.addEventListener("click", () => {
-      burger.classList.toggle("is-active");
-      menu.classList.toggle("is-active");
-    });
-  }
-
   // Filter Elements
-  const searchInput = document.getElementById("searchInput");
   const gameFilter = document.getElementById("gameFilter");
   const userFilter = document.getElementById("userFilter");
   const refreshBtn = document.getElementById("refreshBtn");
   const photoCards = document.querySelectorAll(".photo-card-item");
 
   const applyFilters = () => {
-    const searchText = (searchInput?.value || "").toLowerCase().trim();
     const selectedGame = (gameFilter?.value || "").toLowerCase().trim();
     const selectedUser = (userFilter?.value || "").toLowerCase().trim();
 
     photoCards.forEach((card) => {
       const refid = (card.getAttribute("data-refid") || "").toLowerCase();
       const game = (card.getAttribute("data-game") || "").toLowerCase();
-      const filename = (card.getAttribute("data-filename") || "").toLowerCase();
+      const model = (card.getAttribute("data-model") || "").toLowerCase();
 
-      const matchesSearch =
-        !searchText ||
-        refid.includes(searchText) ||
-        filename.includes(searchText) ||
-        game.includes(searchText);
+      const matchesGame =
+        !selectedGame ||
+        game === selectedGame ||
+        model === selectedGame;
 
-      const matchesGame = !selectedGame || game === selectedGame;
       const matchesUser = !selectedUser || refid === selectedUser;
 
-      if (matchesSearch && matchesGame && matchesUser) {
+      if (matchesGame && matchesUser) {
         card.style.display = "";
       } else {
         card.style.display = "none";
@@ -43,7 +29,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   };
 
-  if (searchInput) searchInput.addEventListener("input", applyFilters);
   if (gameFilter) gameFilter.addEventListener("change", applyFilters);
   if (userFilter) userFilter.addEventListener("change", applyFilters);
   if (refreshBtn) {
@@ -83,6 +68,7 @@ document.addEventListener("DOMContentLoaded", () => {
       openLightbox({
         url: btn.getAttribute("data-url"),
         title: btn.getAttribute("data-title"),
+        model: btn.getAttribute("data-model"),
         refid: btn.getAttribute("data-refid"),
         time: btn.getAttribute("data-time"),
         size: btn.getAttribute("data-size"),
@@ -107,7 +93,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const refid = btn.getAttribute("data-refid");
       const filename = btn.getAttribute("data-filename");
 
-      if (!confirm(`确定要删除照片 ${filename} 吗？此操作不可恢复。`)) {
+      if (!confirm(`Are you sure you want to delete ${filename}? This action cannot be undone.`)) {
         return;
       }
 
@@ -120,10 +106,10 @@ document.addEventListener("DOMContentLoaded", () => {
           const card = btn.closest(".photo-card-item");
           if (card) card.remove();
         } else {
-          alert(`删除失败: ${result.message}`);
+          alert(`Failed to delete: ${result.message}`);
         }
       } catch (err) {
-        alert(`请求出错: ${err}`);
+        alert(`Request error: ${err}`);
       }
     });
   });

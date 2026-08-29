@@ -3,7 +3,6 @@ import * as path from "path";
 import * as crypto from "crypto";
 
 export interface PhotoMetadata {
-  id: string;
   fileName: string;
   refId: string;
   gameModel: string;
@@ -12,40 +11,26 @@ export interface PhotoMetadata {
   timestamp: number;
   fileSizeBytes: number;
   sha256: string;
-  mimeType: string;
-  width?: number;
-  height?: number;
   arrangeNum?: string;
-  url: string;
+  url?: string;
 }
 
 const GAME_TITLES: Record<string, string> = {
-  KLP: "LovePlus Arcade",
-  KFC: "SOUND VOLTEX",
-  MDX: "DanceDanceRevolution",
-  LDJ: "beatmania IIDX",
-  L44: "jubeat",
-  M39: "pop'n music",
-  REC: "Nostalgia",
+  KLP: "Love Plus Arcade Colorful Clip",
 };
 
-export function getGameTitleFromModel(model: string): string {
-  const prefix = model.split(":")[0]?.toUpperCase() || model.substring(0, 3).toUpperCase();
-  return GAME_TITLES[prefix] || (prefix ? `Arcade (${prefix})` : "General Arcade");
+export function getGameTitleFromModel(model?: string): string {
+  if (!model || model === "UNKNOWN") return "Unknown";
+  const prefix = (model.split(":")[0] || model.substring(0, 3)).toUpperCase();
+  return GAME_TITLES[prefix] || "Unknown";
 }
 
-/**
- * Ensures the target directory exists.
- */
 export function ensureDirectoryExists(dirPath: string): void {
   if (!fs.existsSync(dirPath)) {
     fs.mkdirSync(dirPath, { recursive: true });
   }
 }
 
-/**
- * Saves photo binary and companion JSON metadata.
- */
 export function savePhotoWithMetadata(
   baseDir: string,
   refId: string,
@@ -61,10 +46,10 @@ export function savePhotoWithMetadata(
 
   const hash = crypto.createHash("sha256").update(photoBuffer).digest("hex");
   const now = new Date();
-  const gameModel = extra?.gameModel || "KLP:A:A:A:2012100100";
+  const rawModel = extra?.gameModel || "UNKNOWN";
+  const gameModel = rawModel.split(":")[0].toUpperCase();
 
-  const meta: PhotoMetadata = {
-    id: `${refId}_${fileName}`,
+  const metaToSave = {
     fileName,
     refId,
     gameModel,
@@ -73,20 +58,18 @@ export function savePhotoWithMetadata(
     timestamp: now.getTime(),
     fileSizeBytes: photoBuffer.length,
     sha256: hash,
-    mimeType: "image/jpeg",
     arrangeNum: extra?.arrangeNum,
-    url: `/photos/${encodeURIComponent(refId)}/${encodeURIComponent(fileName)}`,
   };
 
   const metaPath = path.join(userDir, `${fileName}.json`);
-  fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf-8");
+  fs.writeFileSync(metaPath, JSON.stringify(metaToSave, null, 2), "utf-8");
 
-  return meta;
+  return {
+    ...metaToSave,
+    url: `/photos/${encodeURIComponent(refId)}/${encodeURIComponent(fileName)}`,
+  };
 }
 
-/**
- * Lists all stored photos with their parsed metadata.
- */
 export function listAllPhotos(baseDir: string): PhotoMetadata[] {
   if (!fs.existsSync(baseDir)) return [];
 
@@ -104,33 +87,40 @@ export function listAllPhotos(baseDir: string): PhotoMetadata[] {
 
       for (const jpg of jpgFiles) {
         const jsonPath = path.join(userDirPath, `${jpg}.json`);
+        const url = `/photos/${encodeURIComponent(refId)}/${encodeURIComponent(jpg)}`;
+
         if (fs.existsSync(jsonPath)) {
           try {
             const raw = fs.readFileSync(jsonPath, "utf-8");
             const meta = JSON.parse(raw) as PhotoMetadata;
-            meta.url = `/photos/${encodeURIComponent(refId)}/${encodeURIComponent(jpg)}`;
+            meta.url = url;
+
+            const currentCode = (meta.gameModel || "UNKNOWN").split(":")[0].toUpperCase();
+            if (meta.gameModel !== currentCode || !meta.gameTitle) {
+              meta.gameModel = currentCode;
+              meta.gameTitle = getGameTitleFromModel(currentCode);
+              try {
+                fs.writeFileSync(jsonPath, JSON.stringify(meta, null, 2), "utf-8");
+              } catch {}
+            }
+
             photos.push(meta);
             continue;
-          } catch {
-            // Ignore parse errors and fallback
-          }
+          } catch {}
         }
 
-        // Fallback metadata if .json doesn't exist
         const jpgPath = path.join(userDirPath, jpg);
         const stat = fs.statSync(jpgPath);
         photos.push({
-          id: `${refId}_${jpg}`,
           fileName: jpg,
           refId,
-          gameModel: "KLP:A:A:A:2012100100",
-          gameTitle: "LovePlus Arcade",
+          gameModel: "UNKNOWN",
+          gameTitle: getGameTitleFromModel("UNKNOWN"),
           uploadTime: stat.mtime.toISOString(),
           timestamp: stat.mtime.getTime(),
           fileSizeBytes: stat.size,
           sha256: "",
-          mimeType: "image/jpeg",
-          url: `/photos/${encodeURIComponent(refId)}/${encodeURIComponent(jpg)}`,
+          url,
         });
       }
     } catch (err) {
@@ -138,13 +128,9 @@ export function listAllPhotos(baseDir: string): PhotoMetadata[] {
     }
   }
 
-  // Sort descending by upload timestamp
   return photos.sort((a, b) => b.timestamp - a.timestamp);
 }
 
-/**
- * Deletes a photo and its metadata file.
- */
 export function deletePhoto(baseDir: string, refId: string, fileName: string): boolean {
   const userDir = path.join(baseDir, refId);
   const jpgPath = path.join(userDir, fileName);

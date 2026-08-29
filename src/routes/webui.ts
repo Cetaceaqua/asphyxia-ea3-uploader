@@ -7,7 +7,6 @@ export const webuiRouter = Router();
 webuiRouter.get("/", (req: Request, res: Response) => {
   const photos = listAllPhotos(CONFIG.SAVEDATA_DIR);
 
-  // Extract unique users and games
   const userSet = new Set<string>();
   const gameSet = new Set<string>();
   let totalBytes = 0;
