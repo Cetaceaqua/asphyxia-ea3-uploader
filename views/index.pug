@@ -1,7 +1,6 @@
 extends layout
 
 block content
-  // Filters Bar
   .box.has-background-dark.mb-5
     .columns.is-variable.is-2.is-vcentered
       .column.is-5
@@ -12,7 +11,7 @@ block content
               select#gameFilter
                 option(value="") All Games
                 each game in gameList
-                  option(value=game) #{game}
+                  option(value=game.model) #{game.title}
             span.icon.is-small.is-left
               i.mdi.mdi-gamepad-variant
 
@@ -35,7 +34,6 @@ block content
             i.mdi.mdi-refresh
           span Refresh
 
-  // Photo Grid
   if photos.length === 0
     .box.has-text-centered.py-6
       span.icon.is-large.has-text-grey
@@ -49,34 +47,78 @@ block content
           data-refid=photo.refId
           data-game=photo.gameTitle
           data-model=photo.gameModel
+          data-type=photo.imageType
           data-filename=photo.fileName
           data-time=photo.uploadTime
+          data-is-card=(photo.isCard ? "true" : "false")
+          data-card-id=(photo.cardId || "")
+          data-front-url=(photo.frontUrl || photo.url)
+          data-back-url=(photo.backUrl || "")
+          data-holo-url=(photo.holoUrl || "")
+          data-ir-url=(photo.irUrl || "")
+          data-has-holo=(photo.hasHolo ? "true" : "false")
+          data-has-back=(photo.hasBack ? "true" : "false")
+          data-orientation=(photo.orientation || "portrait")
+          data-card-meta=(photo.cardMeta ? JSON.stringify(photo.cardMeta) : "")
         )
           .card.photo-card
             .card-image
-              figure.image.is-3by4.photo-thumb-container
-                img.photo-thumb(src=photo.url alt=photo.fileName loading="lazy")
+              figure.image.photo-thumb-container(
+                style=(photo.orientation === 'landscape' ? "aspect-ratio: 1024 / 662;" : "aspect-ratio: 662 / 1024;")
+              )
+                img.photo-thumb(src=(photo.frontUrl || photo.url) alt=photo.fileName loading="lazy")
+                if photo.imageType === 'Shinki Card' && photo.hasHolo && photo.holoUrl
+                  .photo-thumb-holo(
+                    style=`-webkit-mask-image: url('${photo.holoUrl}'); mask-image: url('${photo.holoUrl}');`
+                  )
                 .photo-overlay
                   button.button.is-small.is-primary.btn-preview(
-                    data-url=photo.url
+                    data-url=(photo.frontUrl || photo.url)
                     data-title=photo.gameTitle
                     data-model=photo.gameModel
+                    data-type=photo.imageType
                     data-refid=photo.refId
                     data-time=photo.uploadTime
                     data-size=(photo.fileSizeBytes / 1024).toFixed(1) + " KB"
                     data-filename=photo.fileName
+                    data-is-card="true"
+                    data-card-id=(photo.cardId || "")
+                    data-front-url=(photo.frontUrl || photo.url)
+                    data-back-url=(photo.backUrl || "")
+                    data-holo-url=(photo.holoUrl || "")
+                    data-ir-url=(photo.irUrl || "")
+                    data-has-holo=(photo.hasHolo ? "true" : "false")
+                    data-has-back=(photo.hasBack ? "true" : "false")
+                    data-orientation=(photo.orientation || "portrait")
+                    data-card-meta=(photo.cardMeta ? JSON.stringify(photo.cardMeta) : "")
                   )
                     span.icon
                       i.mdi.mdi-eye
-                    span Preview
+                    span Detail
             .card-content.p-3
               .level.is-mobile.mb-1
                 .level-left
-                  span.tag.is-primary.is-light.is-small #{photo.gameTitle}
+                  .tags.has-addons.mb-0
+                    span.tag.is-primary.is-light.is-small #{photo.gameModel || photo.gameTitle}
+                    if photo.imageType
+                      span.tag.is-info.is-light.is-small #{photo.imageType}
+                    if photo.hasHolo
+                      span.tag.holo-tag.is-small
+                        span.icon.is-small
+                          i.mdi.mdi-creation
+                        span Holo
+                    if photo.cardMeta && photo.cardMeta.rarity
+                      span.tag.is-dark.rarity-stars.is-small #{'★'.repeat(photo.cardMeta.rarity)}
                 .level-right
                   span.tag.is-dark.is-small #{(photo.fileSizeBytes / 1024).toFixed(1)} KB
 
-              p.is-size-7.has-text-weight-semibold.has-text-white.text-truncate(title=photo.fileName)
+              if photo.cardMeta && photo.cardMeta.description
+                p.is-size-6.has-text-weight-bold.has-text-warning.text-truncate.mb-1(title=photo.cardMeta.description)
+                  | #{photo.cardMeta.description}
+                  if photo.cardMeta.holoName
+                    span.is-size-7.has-text-grey-light.ml-2 [#{photo.cardMeta.holoName}]
+
+              p.is-size-7.has-text-weight-semibold.has-text-grey-light.text-truncate(title=photo.fileName)
                 | #{photo.fileName}
 
               .level.is-mobile.is-size-7.has-text-grey-light.mt-2
@@ -90,10 +132,6 @@ block content
                   span #{new Date(photo.timestamp).toLocaleDateString()}
 
             footer.card-footer
-              a.card-footer-item.has-text-info.is-size-7(href=photo.url download=photo.fileName)
-                span.icon.is-small
-                  i.mdi.mdi-download
-                span Download
               a.card-footer-item.has-text-danger.is-size-7.btn-delete(
                 href="#"
                 data-refid=photo.refId
@@ -103,20 +141,66 @@ block content
                   i.mdi.mdi-trash-can-outline
                 span Delete
 
-  // Lightbox Modal
   #lightboxModal.modal
     .modal-background
     .modal-content.lightbox-content
-      .lightbox-image-wrapper
-        img#lightboxImg(src="" alt="Preview")
-      .box.has-background-dark.has-text-left.p-4.lightbox-info-box
-        .columns.is-mobile.is-vcentered
-          .column
-            p#lightboxTitle.title.is-6.has-text-white.mb-1
-            p#lightboxDetails.subtitle.is-7.has-text-grey-light.mb-0
-          .column.is-narrow
-            a#lightboxDownload.button.is-small.is-primary(href="" download="")
-              span.icon
-                i.mdi.mdi-download
-              span Download
+      #cardStageSection.holo-stage-container
+        .holo-stage-viewport
+          #holoCardWrapper.holo-card-wrapper.is-portrait
+            #holoCardRotator.holo-card-rotator
+              #holoFaceFront.holo-card-face.face-front
+                img#holoImgFront.holo-card-img(src="" alt="Front")
+                #holoFoilContainer.holo-foil-container
+                  #holoFoilBase.holo-foil-base
+                  #holoFoilRainbow.holo-foil-rainbow
+                  #holoFoilPattern.holo-foil-pattern
+                .holo-glare
+              #holoFaceBack.holo-card-face.face-back(style="display: none;")
+                img#holoImgBack.holo-card-img(src="" alt="Back")
+                .holo-glare
+
+        .holo-controls-bar
+          button#btnHoloFlip.button.is-small.is-dark
+            span.icon
+              i.mdi.mdi-rotate-3d-variant
+            span.btn-label Flip
+          button#btnHoloToggle.button.is-small.is-dark.is-active-toggle
+            span.icon
+              i.mdi.mdi-creation
+            span.btn-label Holo
+          .control
+            .select.is-small
+              select#holoPatternSelect
+                option(value="basic") Glitter
+                option(value="starlight") Starlight
+                option(value="prismatic") Prismatic
+                option(value="dots") Dot Matrix
+          button#btnHoloAutoTilt.button.is-small.is-dark
+            span.icon
+              i.mdi.mdi-play-circle-outline
+            span Auto
+
+        .holo-info-panel
+          h3#holoCardTitle.title.is-5.has-text-white.mb-2
+          .holo-meta-row.mb-3
+            #holoCardTags.holo-meta-tags
+            .buttons.are-small.mb-0
+              a#dlCardFront.button.is-primary.is-small(href="" download="")
+                span.icon
+                  i.mdi.mdi-download
+                span Front
+              a#dlCardBack.button.is-info.is-small(href="" download="" style="display: none;")
+                span.icon
+                  i.mdi.mdi-download
+                span Back
+              a#dlCardHolo.button.is-warning.is-small(href="" download="" style="display: none;")
+                span.icon
+                  i.mdi.mdi-download
+                span Holo
+              a#dlCardIr.button.is-dark.is-small(href="" download="" style="display: none;")
+                span.icon
+                  i.mdi.mdi-download
+                span QR Code
+          p#holoCardDesc.subtitle.is-7.has-text-grey-light.mb-0
+
     button#lightboxClose.modal-close.is-large(aria-label="close")

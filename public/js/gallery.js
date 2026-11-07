@@ -1,5 +1,4 @@
 document.addEventListener("DOMContentLoaded", () => {
-  // Filter Elements
   const gameFilter = document.getElementById("gameFilter");
   const userFilter = document.getElementById("userFilter");
   const refreshBtn = document.getElementById("refreshBtn");
@@ -37,63 +36,94 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Lightbox Modal
   const modal = document.getElementById("lightboxModal");
-  const modalImg = document.getElementById("lightboxImg");
-  const modalTitle = document.getElementById("lightboxTitle");
-  const modalDetails = document.getElementById("lightboxDetails");
-  const modalDownload = document.getElementById("lightboxDownload");
+  const cardStageSection = document.getElementById("cardStageSection");
   const modalClose = document.getElementById("lightboxClose");
   const modalBg = modal?.querySelector(".modal-background");
 
-  const openLightbox = (data) => {
+  const extractItemData = (el) => {
+    const cardEl = el.closest(".photo-card-item") || el;
+    let cardMeta = {};
+    try {
+      const raw = cardEl.getAttribute("data-card-meta");
+      if (raw) cardMeta = JSON.parse(raw);
+    } catch {}
+
+    return {
+      url: cardEl.getAttribute("data-front-url") || cardEl.getAttribute("data-url") || el.getAttribute("data-url"),
+      frontUrl: cardEl.getAttribute("data-front-url") || cardEl.getAttribute("data-url"),
+      backUrl: cardEl.getAttribute("data-back-url") || "",
+      holoUrl: cardEl.getAttribute("data-holo-url") || "",
+      irUrl: cardEl.getAttribute("data-ir-url") || "",
+      hasHolo: cardEl.getAttribute("data-has-holo") === "true",
+      hasBack: cardEl.getAttribute("data-has-back") === "true",
+      isCard: cardEl.getAttribute("data-is-card") === "true",
+      cardId: cardEl.getAttribute("data-card-id") || "",
+      orientation: cardEl.getAttribute("data-orientation") || "portrait",
+      title: cardEl.getAttribute("data-game") || el.getAttribute("data-title"),
+      model: cardEl.getAttribute("data-model") || el.getAttribute("data-model"),
+      type: cardEl.getAttribute("data-type") || el.getAttribute("data-type"),
+      refid: cardEl.getAttribute("data-refid") || el.getAttribute("data-refid"),
+      time: cardEl.getAttribute("data-time") || el.getAttribute("data-time"),
+      size: el.getAttribute("data-size") || "",
+      filename: cardEl.getAttribute("data-filename") || el.getAttribute("data-filename"),
+      cardMeta,
+    };
+  };
+
+  const openViewer = (data) => {
     if (!modal) return;
-    modalImg.src = data.url;
-    modalTitle.textContent = `${data.title} - ${data.filename}`;
-    modalDetails.textContent = `Player: ${data.refid} | Size: ${data.size} | Uploaded: ${new Date(data.time).toLocaleString()}`;
-    modalDownload.href = data.url;
-    modalDownload.setAttribute("download", data.filename);
+
+    if (window.holoStage) {
+      if (cardStageSection) cardStageSection.style.display = "flex";
+      window.holoStage.setCard(data);
+    }
+
     modal.classList.add("is-active");
   };
 
-  const closeLightbox = () => {
+  const closeViewer = () => {
     if (!modal) return;
     modal.classList.remove("is-active");
-    modalImg.src = "";
+    if (window.holoStage) {
+      window.holoStage.stopAutoTilt();
+      window.holoStage.resetTilt();
+      window.holoStage.resetFlip();
+    }
   };
 
   document.querySelectorAll(".btn-preview").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       e.preventDefault();
-      openLightbox({
-        url: btn.getAttribute("data-url"),
-        title: btn.getAttribute("data-title"),
-        model: btn.getAttribute("data-model"),
-        refid: btn.getAttribute("data-refid"),
-        time: btn.getAttribute("data-time"),
-        size: btn.getAttribute("data-size"),
-        filename: btn.getAttribute("data-filename"),
-      });
+      e.stopPropagation();
+      openViewer(extractItemData(btn));
     });
   });
 
-  if (modalClose) modalClose.addEventListener("click", closeLightbox);
-  if (modalBg) modalBg.addEventListener("click", closeLightbox);
+  document.querySelectorAll(".photo-thumb-container").forEach((thumb) => {
+    thumb.addEventListener("click", (e) => {
+      if (e.target.closest("button") || e.target.closest("a")) return;
+      openViewer(extractItemData(thumb));
+    });
+  });
+
+  if (modalClose) modalClose.addEventListener("click", closeViewer);
+  if (modalBg) modalBg.addEventListener("click", closeViewer);
 
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && modal?.classList.contains("is-active")) {
-      closeLightbox();
+      closeViewer();
     }
   });
 
-  // Delete Handler
   document.querySelectorAll(".btn-delete").forEach((btn) => {
     btn.addEventListener("click", async (e) => {
       e.preventDefault();
+      e.stopPropagation();
       const refid = btn.getAttribute("data-refid");
       const filename = btn.getAttribute("data-filename");
 
-      if (!confirm(`Are you sure you want to delete ${filename}? This action cannot be undone.`)) {
+      if (!confirm(`Are you sure you want to delete ${filename}? All card files in this set will be removed.`)) {
         return;
       }
 
@@ -104,7 +134,12 @@ document.addEventListener("DOMContentLoaded", () => {
         const result = await res.json();
         if (result.success) {
           const card = btn.closest(".photo-card-item");
-          if (card) card.remove();
+          if (card) {
+            card.style.transition = "opacity 0.3s ease, transform 0.3s ease";
+            card.style.opacity = "0";
+            card.style.transform = "scale(0.8)";
+            setTimeout(() => card.remove(), 300);
+          }
         } else {
           alert(`Failed to delete: ${result.message}`);
         }
@@ -113,4 +148,17 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   });
+
+  const urlCard = new URLSearchParams(window.location.search).get("card");
+  if (urlCard) {
+    const targetBtn =
+      document.querySelector(`.photo-card-item[data-card-id="${urlCard}"] .btn-preview`) ||
+      document.querySelector(`.photo-card-item[data-filename*="${urlCard}"] .btn-preview`);
+    if (targetBtn) {
+      if (!window.holoStage && window.HoloCardStage) {
+        window.holoStage = new window.HoloCardStage();
+      }
+      openViewer(extractItemData(targetBtn));
+    }
+  }
 });
