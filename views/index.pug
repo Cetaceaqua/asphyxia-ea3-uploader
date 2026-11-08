@@ -41,9 +41,9 @@ block content
       p.title.is-5.has-text-grey.mt-3 No photos uploaded yet
       p.subtitle.is-6.has-text-grey-light Photos uploaded in games will appear here.
   else
-    #photoGrid.columns.is-multiline
+    #photoGrid.photo-grid-masonry
       each photo in photos
-        .column.is-4-desktop.is-6-tablet.photo-card-item(
+        .photo-card-item(
           data-refid=photo.refId
           data-game=photo.gameTitle
           data-model=photo.gameModel
@@ -115,8 +115,6 @@ block content
               if photo.cardMeta && photo.cardMeta.description
                 p.is-size-6.has-text-weight-bold.has-text-warning.text-truncate.mb-1(title=photo.cardMeta.description)
                   | #{photo.cardMeta.description}
-                  if photo.cardMeta.holoName
-                    span.is-size-7.has-text-grey-light.ml-2 [#{photo.cardMeta.holoName}]
 
               p.is-size-7.has-text-weight-semibold.has-text-grey-light.text-truncate(title=photo.fileName)
                 | #{photo.fileName}

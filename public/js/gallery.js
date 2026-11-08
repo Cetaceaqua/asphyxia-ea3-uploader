@@ -3,6 +3,49 @@ document.addEventListener("DOMContentLoaded", () => {
   const userFilter = document.getElementById("userFilter");
   const refreshBtn = document.getElementById("refreshBtn");
   const photoCards = document.querySelectorAll(".photo-card-item");
+  const grid = document.getElementById("photoGrid");
+
+  const layoutMasonry = () => {
+    if (!grid) return;
+    const cards = Array.from(grid.querySelectorAll(".photo-card-item")).filter(
+      (c) => c.style.display !== "none"
+    );
+    if (cards.length === 0) {
+      grid.style.height = "0px";
+      return;
+    }
+
+    const containerWidth = grid.clientWidth;
+    let colCount = 3;
+    if (containerWidth < 768) {
+      colCount = 1;
+    } else if (containerWidth < 1024) {
+      colCount = 2;
+    }
+
+    const gap = 20;
+    const colWidth = Math.floor((containerWidth - gap * (colCount - 1)) / colCount);
+    const colHeights = new Array(colCount).fill(0);
+
+    cards.forEach((card) => {
+      let minCol = 0;
+      for (let i = 1; i < colCount; i++) {
+        if (colHeights[i] < colHeights[minCol]) {
+          minCol = i;
+        }
+      }
+
+      const x = minCol * (colWidth + gap);
+      const y = colHeights[minCol];
+
+      card.style.width = `${colWidth}px`;
+      card.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+
+      colHeights[minCol] += card.offsetHeight + gap;
+    });
+
+    grid.style.height = `${Math.max(...colHeights)}px`;
+  };
 
   const applyFilters = () => {
     const selectedGame = (gameFilter?.value || "").toLowerCase().trim();
@@ -26,7 +69,18 @@ document.addEventListener("DOMContentLoaded", () => {
         card.style.display = "none";
       }
     });
+
+    layoutMasonry();
   };
+
+  layoutMasonry();
+  window.addEventListener("load", layoutMasonry);
+
+  let resizeTimer;
+  window.addEventListener("resize", () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(layoutMasonry, 50);
+  });
 
   if (gameFilter) gameFilter.addEventListener("change", applyFilters);
   if (userFilter) userFilter.addEventListener("change", applyFilters);
@@ -137,8 +191,11 @@ document.addEventListener("DOMContentLoaded", () => {
           if (card) {
             card.style.transition = "opacity 0.3s ease, transform 0.3s ease";
             card.style.opacity = "0";
-            card.style.transform = "scale(0.8)";
-            setTimeout(() => card.remove(), 300);
+            card.style.transform += " scale(0.8)";
+            setTimeout(() => {
+              card.remove();
+              layoutMasonry();
+            }, 300);
           }
         } else {
           alert(`Failed to delete: ${result.message}`);

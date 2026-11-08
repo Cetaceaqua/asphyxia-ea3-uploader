@@ -284,9 +284,6 @@
 
       const meta = data.cardMeta || {};
       let cardTitle = meta.description;
-      if (cardTitle && meta.holoName) {
-        cardTitle += ` [${meta.holoName}]`;
-      }
       if (!cardTitle) {
         cardTitle = data.type || data.filename;
       }
